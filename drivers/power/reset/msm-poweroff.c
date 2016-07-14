@@ -168,11 +168,6 @@ static void set_dload_mode(int on)
 	dload_mode_enabled = on;
 }
 
-static bool get_dload_mode(void)
-{
-	return dload_mode_enabled;
-}
-
 static void enable_emergency_dload_mode(void)
 {
 	int ret;
@@ -228,11 +223,6 @@ static void enable_emergency_dload_mode(void)
 {
 	pr_err("dload mode is not enabled on target\n");
 }
-
-static bool get_dload_mode(void)
-{
-	return false;
-}
 #endif
 
 static void scm_disable_sdi(void)
@@ -287,8 +277,6 @@ static void halt_spmi_pmic_arbiter(void)
 
 static void msm_restart_prepare(const char *cmd)
 {
-	bool need_warm_reset = false;
-
 #ifdef CONFIG_MSM_DLOAD_MODE
 
 	/* Write download mode flags if we're panic'ing
@@ -300,78 +288,56 @@ static void msm_restart_prepare(const char *cmd)
 			(in_panic || restart_mode == RESTART_DLOAD));
 #endif
 
-	if (qpnp_pon_check_hard_reset_stored()) {
-		/* Set warm reset as true when device is in dload mode */
-		if (get_dload_mode() ||
-			((cmd != NULL && cmd[0] != '\0') &&
-			!strcmp(cmd, "edl")))
-			need_warm_reset = true;
-	} else {
-            need_warm_reset = (get_dload_mode() ||
-				(cmd != NULL && cmd[0] != '\0'));
-	}
+	/* Warm reset the PMIC to maintain memory contents. */
+	qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
 
-	/* Hard reset the PMIC unless memory contents must be maintained. */
-	if (need_warm_reset) {
-		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
-	} else {
-		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
-	}
-
-	if (cmd != NULL) {
-        if (!strncmp(cmd, "rf", 2)) {
-            qpnp_pon_set_restart_reason(PON_RESTART_REASON_RF);
-	        __raw_writel(RF_MODE, restart_reason);
-	    }else if(!strncmp(cmd, "wlan", 4)){
-	        qpnp_pon_set_restart_reason(PON_RESTART_REASON_WLAN);
-	        __raw_writel(WLAN_MODE, restart_reason);
-	    }else if(!strncmp(cmd, "mos", 3)) {
-	        qpnp_pon_set_restart_reason(PON_RESTART_REASON_MOS);
-	        __raw_writel(MOS_MODE, restart_reason);
-	    }else if(!strncmp(cmd, "ftm", 3)) {
-	        qpnp_pon_set_restart_reason(PON_RESTART_REASON_FACTORY);
-	        __raw_writel(FACTORY_MODE, restart_reason);
-	    }else if(!strncmp(cmd, "kernel", 6)) {
-	        qpnp_pon_set_restart_reason(PON_RESTART_REASON_KERNEL);
-	        __raw_writel(KERNEL_MODE, restart_reason);
-	    }else if (!strncmp(cmd, "modem", 5)) {
-	        qpnp_pon_set_restart_reason(PON_RESTART_REASON_MODEM);
-	        __raw_writel(MODEM_MODE, restart_reason);
-	    }else if (!strncmp(cmd, "android", 7)) {
-	        qpnp_pon_set_restart_reason(PON_RESTART_REASON_ANDROID);
-	        __raw_writel(ANDROID_MODE, restart_reason);
-	    }else
-		if (!strncmp(cmd, "bootloader", 10)) {
-			qpnp_pon_set_restart_reason(
-				PON_RESTART_REASON_BOOTLOADER);
+	if (cmd != NULL || in_panic) {
+		if (!strncmp(cmd, "rf", 2)) {
+			qpnp_pon_set_restart_reason(PON_RESTART_REASON_RF);
+			__raw_writel(RF_MODE, restart_reason);
+		} else if (!strncmp(cmd, "wlan", 4)) {
+			qpnp_pon_set_restart_reason(PON_RESTART_REASON_WLAN);
+			__raw_writel(WLAN_MODE, restart_reason);
+		} else if (!strncmp(cmd, "mos", 3)) {
+			qpnp_pon_set_restart_reason(PON_RESTART_REASON_MOS);
+			__raw_writel(MOS_MODE, restart_reason);
+		} else if (!strncmp(cmd, "ftm", 3)) {
+			qpnp_pon_set_restart_reason(PON_RESTART_REASON_FACTORY);
+			__raw_writel(FACTORY_MODE, restart_reason);
+		} else if (!strncmp(cmd, "kernel", 6)) {
+			qpnp_pon_set_restart_reason(PON_RESTART_REASON_KERNEL);
+			__raw_writel(KERNEL_MODE, restart_reason);
+		} else if (!strncmp(cmd, "modem", 5)) {
+			qpnp_pon_set_restart_reason(PON_RESTART_REASON_MODEM);
+			__raw_writel(MODEM_MODE, restart_reason);
+		} else if (!strncmp(cmd, "android", 7)) {
+			qpnp_pon_set_restart_reason(PON_RESTART_REASON_ANDROID);
+			__raw_writel(ANDROID_MODE, restart_reason);
+		} else if (!strncmp(cmd, "bootloader", 10)) {
+			qpnp_pon_set_restart_reason
+			    (PON_RESTART_REASON_BOOTLOADER);
 			__raw_writel(0x77665500, restart_reason);
 		} else if (!strncmp(cmd, "recovery", 8)) {
-			qpnp_pon_set_restart_reason(
-				PON_RESTART_REASON_RECOVERY);
+			qpnp_pon_set_restart_reason
+			    (PON_RESTART_REASON_RECOVERY);
 			__raw_writel(0x77665502, restart_reason);
-		}
-
-                else if (!strcmp(cmd, "aging")) {
-			qpnp_pon_set_restart_reason(
-				PON_RESTART_REASON_AGING);
+		} else if (!strcmp(cmd, "aging")) {
+			qpnp_pon_set_restart_reason(PON_RESTART_REASON_AGING);
 			__raw_writel(0x77665510, restart_reason);
-              }
-
-                else if (!strcmp(cmd, "rtc")) {
-			qpnp_pon_set_restart_reason(
-				PON_RESTART_REASON_RTC);
+		} else if (!strcmp(cmd, "rtc")) {
+			qpnp_pon_set_restart_reason(PON_RESTART_REASON_RTC);
 			__raw_writel(0x77665503, restart_reason);
 		} else if (!strcmp(cmd, "dm-verity device corrupted")) {
-			qpnp_pon_set_restart_reason(
-				PON_RESTART_REASON_DMVERITY_CORRUPTED);
+			qpnp_pon_set_restart_reason
+			    (PON_RESTART_REASON_DMVERITY_CORRUPTED);
 			__raw_writel(0x77665508, restart_reason);
 		} else if (!strcmp(cmd, "dm-verity enforcing")) {
-			qpnp_pon_set_restart_reason(
-				PON_RESTART_REASON_DMVERITY_ENFORCE);
+			qpnp_pon_set_restart_reason
+			    (PON_RESTART_REASON_DMVERITY_ENFORCE);
 			__raw_writel(0x77665509, restart_reason);
 		} else if (!strcmp(cmd, "keys clear")) {
-			qpnp_pon_set_restart_reason(
-				PON_RESTART_REASON_KEYS_CLEAR);
+			qpnp_pon_set_restart_reason
+			    (PON_RESTART_REASON_KEYS_CLEAR);
 			__raw_writel(0x7766550a, restart_reason);
 		} else if (!strncmp(cmd, "oem-", 4)) {
 			unsigned long code;
@@ -383,23 +349,24 @@ static void msm_restart_prepare(const char *cmd)
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
 		} else {
-		    pr_notice("%s : cmd is %s, set to reboot mode\n", __func__, cmd);
-            qpnp_pon_set_restart_reason(PON_RESTART_REASON_REBOOT);
+			pr_notice("%s : cmd is %s, set to reboot mode\n",
+				  __func__, cmd);
+			qpnp_pon_set_restart_reason(PON_RESTART_REASON_REBOOT);
 			__raw_writel(0x77665501, restart_reason);
 		}
+	} else {
+		if (cmd == NULL)
+			pr_notice("%s : cmd is NULL, set to reboot mode\n",
+				  __func__);
+		qpnp_pon_set_restart_reason(PON_RESTART_REASON_REBOOT);
+		__raw_writel(0x77665501, restart_reason);
 	}
-    else {
-        pr_notice("%s : cmd is NULL, set to reboot mode\n", __func__);
-        qpnp_pon_set_restart_reason(PON_RESTART_REASON_REBOOT);
-        __raw_writel(0x77665501, restart_reason);
-    }
 	flush_cache_all();
 
-	/*outer_flush_all is not supported by 64bit kernel*/
+	/* Outer_flush_all is not supported by 64bit kernel */
 #ifndef CONFIG_ARM64
 	outer_flush_all();
 #endif
-
 }
 
 /*
