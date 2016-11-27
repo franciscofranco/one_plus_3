@@ -2635,7 +2635,8 @@ static void smbchg_parallel_usb_en_work(struct work_struct *work)
 	return;
 
 recheck:
-	schedule_delayed_work(&chip->parallel_en_work, 0);
+	queue_delayed_work(system_power_efficient_wq,
+		&chip->parallel_en_work, 0);
 }
 
 static void smbchg_parallel_usb_check_ok(struct smbchg_chip *chip)
@@ -2646,7 +2647,8 @@ static void smbchg_parallel_usb_check_ok(struct smbchg_chip *chip)
 		return;
 
 	smbchg_stay_awake(chip, PM_PARALLEL_CHECK);
-	schedule_delayed_work(&chip->parallel_en_work, 0);
+	queue_delayed_work(system_power_efficient_wq,
+		&chip->parallel_en_work, 0);
 }
 
 static int charging_suspend_vote_cb(struct device *dev, int suspend,
@@ -3472,7 +3474,8 @@ static void smbchg_vfloat_adjust_check(struct smbchg_chip *chip)
 
 	smbchg_stay_awake(chip, PM_REASON_VFLOAT_ADJUST);
 	pr_smb(PR_STATUS, "Starting vfloat adjustments\n");
-	schedule_delayed_work(&chip->vfloat_adjust_work, 0);
+	queue_delayed_work(system_power_efficient_wq,
+		&chip->vfloat_adjust_work, 0);
 }
 
 #define FV_STS_REG			0xC
@@ -4774,8 +4777,9 @@ stop:
 	return;
 
 reschedule:
-	schedule_delayed_work(&chip->vfloat_adjust_work,
-			msecs_to_jiffies(VFLOAT_RESAMPLE_DELAY_MS));
+	queue_delayed_work(system_power_efficient_wq,
+		&chip->vfloat_adjust_work,
+		msecs_to_jiffies(VFLOAT_RESAMPLE_DELAY_MS));
 	return;
 }
 
@@ -5198,12 +5202,14 @@ static void smbchg_re_det_work(struct work_struct *work)
 	read_usb_type(chip, &usb_type_name, &usb_supply_type);
 	if(usb_supply_type == POWER_SUPPLY_TYPE_USB_DCP)
 		{
-		schedule_delayed_work(&chip->check_switch_dash_work,
-					msecs_to_jiffies(500));
+			queue_delayed_work(system_power_efficient_wq,
+				&chip->check_switch_dash_work,
+				msecs_to_jiffies(500));
 		}
 		else
 		{
-		schedule_delayed_work(&chip->nonstandard_charger_charge_current_set_work,
+			queue_delayed_work(system_power_efficient_wq,
+				&chip->nonstandard_charger_charge_current_set_work,
 				msecs_to_jiffies(NON_STANDARD_CHARGER_CHECK_MS));
 		}
     }
@@ -5226,8 +5232,9 @@ static void handle_usb_insertion(struct smbchg_chip *chip)
 	charger_type_value= usb_supply_type;
 	/* david.liu@oneplus.tw,20151119  Add delayed workqueue to re-detect charger type */
 	if (redet_en && usb_supply_type == POWER_SUPPLY_TYPE_USB) {
-		schedule_delayed_work(&chip->re_det_work,
-				msecs_to_jiffies(REDET_DELAY_MS));
+		queue_delayed_work(system_power_efficient_wq,
+			&chip->re_det_work,
+			msecs_to_jiffies(REDET_DELAY_MS));
 	}
 	pr_err("inserted type = %d (%s)", usb_supply_type, usb_type_name);
 	if((qpnp_battery_temp_region_get(chip) != CV_BATTERY_TEMP_REGION__COLD)&&(qpnp_battery_temp_region_get(chip) != CV_BATTERY_TEMP_REGION__HOT) )
@@ -5273,8 +5280,9 @@ static void handle_usb_insertion(struct smbchg_chip *chip)
 	if (!chip->hvdcp_not_supported &&
 			(usb_supply_type == POWER_SUPPLY_TYPE_USB_DCP)) {
 		cancel_delayed_work_sync(&chip->hvdcp_det_work);
-		schedule_delayed_work(&chip->hvdcp_det_work,
-					msecs_to_jiffies(HVDCP_NOTIFY_MS));
+		queue_delayed_work(system_power_efficient_wq,
+			&chip->hvdcp_det_work,
+			msecs_to_jiffies(HVDCP_NOTIFY_MS));
 	}
 
 	if (parallel_psy) {
@@ -5294,12 +5302,14 @@ static void handle_usb_insertion(struct smbchg_chip *chip)
 	{
 		if(chip->probe_success == true)
 		{
-		schedule_delayed_work(&chip->check_switch_dash_work,
-					msecs_to_jiffies(500));
+			queue_delayed_work(system_power_efficient_wq,
+				&chip->check_switch_dash_work,
+				msecs_to_jiffies(500));
 		if(usb_supply_type == POWER_SUPPLY_TYPE_USB)
 		{
-		schedule_delayed_work(&chip->nonstandard_charger_charge_current_set_work,
-					msecs_to_jiffies(NON_STANDARD_CHARGER_CHECK_MS));
+			queue_delayed_work(system_power_efficient_wq,
+				&chip->nonstandard_charger_charge_current_set_work,
+				msecs_to_jiffies(NON_STANDARD_CHARGER_CHECK_MS));
 		}
 		}
 	}
@@ -9292,7 +9302,8 @@ static void update_heartbeat(struct work_struct *work)
 		}
 		// add for disable normal charge end
 		/*update time 6s*/
-		schedule_delayed_work(&chip->update_heartbeat_work,
+			queue_delayed_work(system_power_efficient_wq,
+				&chip->update_heartbeat_work,
 				round_jiffies_relative(msecs_to_jiffies
 					(BATT_HEARTBEAT_INTERVAL)));
 		return;
@@ -9303,8 +9314,9 @@ static void update_heartbeat(struct work_struct *work)
 			chip->fastchg_start_disable_normal_chg =false;
 			smbchg_charging_en(chip, true);
 		}
-		schedule_delayed_work(&chip->check_switch_dash_work,
-							msecs_to_jiffies(100));
+			queue_delayed_work(system_power_efficient_wq,
+				&chip->check_switch_dash_work,
+				msecs_to_jiffies(100));
 	}
 	if (!chip->hvdcp_present)
 		qpnp_check_charger_uovp(chip);
@@ -9412,9 +9424,10 @@ static void update_heartbeat(struct work_struct *work)
 	}
 out:
 	/*update time 6s*/
-	schedule_delayed_work(&chip->update_heartbeat_work,
-			round_jiffies_relative(msecs_to_jiffies
-				(BATT_HEARTBEAT_INTERVAL)));
+	queue_delayed_work(system_power_efficient_wq,
+		&chip->update_heartbeat_work,
+		round_jiffies_relative(msecs_to_jiffies
+			(BATT_HEARTBEAT_INTERVAL)));
 }
 
 /* yangfangbiao@oneplus.cn, 2015/05/11  Modify for backup soc  Begin  */
@@ -9920,8 +9933,9 @@ static int smbchg_probe(struct spmi_device *spmi)
 	}
 
 	if (is_usb_present(chip)) {
-		schedule_delayed_work(&chip->re_det_work,
-				msecs_to_jiffies(REDET_DELAY_MS));
+		queue_delayed_work(system_power_efficient_wq,
+			&chip->re_det_work,
+			msecs_to_jiffies(REDET_DELAY_MS));
 	}
 	else
 	{
@@ -9930,9 +9944,10 @@ static int smbchg_probe(struct spmi_device *spmi)
 
 	INIT_DELAYED_WORK(&chip->update_heartbeat_work,
 			update_heartbeat);
-	schedule_delayed_work(&chip->update_heartbeat_work,
-			round_jiffies_relative(msecs_to_jiffies
-				(BATT_HEARTBEAT_INTERVAL)));
+	queue_delayed_work(system_power_efficient_wq,
+		&chip->update_heartbeat_work,
+		round_jiffies_relative(msecs_to_jiffies
+			(BATT_HEARTBEAT_INTERVAL)));
 
 	rc = device_create_file(chip->dev, &dev_attr_test_chg_vol);
 	if (rc < 0) {
