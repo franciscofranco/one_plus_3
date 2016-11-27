@@ -1344,7 +1344,8 @@ static void fg_check_ima_error_handling(struct fg_chip *chip)
 	if (!chip->ima_error_handling) {
 		fg_enable_irqs(chip, false);
 		chip->ima_error_handling = true;
-		schedule_delayed_work(&chip->ima_error_recovery_work,
+		queue_delayed_work(system_power_efficient_wq,
+			&chip->ima_error_recovery_work,
 			msecs_to_jiffies(0));
 	} else {
 		if (fg_debug_mask & FG_STATUS)
@@ -1919,9 +1920,11 @@ static void fg_handle_battery_insertion(struct fg_chip *chip)
 {
 	reinit_completion(&chip->batt_id_avail);
 	reinit_completion(&chip->fg_reset_done);
-	schedule_delayed_work(&chip->batt_profile_init, 0);
+	queue_delayed_work(system_power_efficient_wq,
+		&chip->batt_profile_init, 0);
 	cancel_delayed_work(&chip->update_sram_data);
-	schedule_delayed_work(&chip->update_sram_data, msecs_to_jiffies(0));
+	queue_delayed_work(system_power_efficient_wq,
+		&chip->update_sram_data, msecs_to_jiffies(0));
 }
 
 
@@ -2260,7 +2263,7 @@ static int set_prop_jeita_temp(struct fg_chip *chip,
 
 	cancel_delayed_work_sync(
 		&chip->update_jeita_setting);
-	schedule_delayed_work(
+	queue_delayed_work(system_power_efficient_wq,
 		&chip->update_jeita_setting, 0);
 
 	return rc;
@@ -2565,7 +2568,7 @@ wait:
 
 out:
 	if (!rc)
-		schedule_delayed_work(
+		queue_delayed_work(system_power_efficient_wq,
 			&chip->update_sram_data,
 			msecs_to_jiffies(resched_ms));
 }
@@ -2657,7 +2660,7 @@ out:
 	fg_relax(&chip->update_temp_wakeup_source);
 
 resched:
-	schedule_delayed_work(
+	queue_delayed_work(system_power_efficient_wq,
 		&chip->update_temp_work,
 		msecs_to_jiffies(TEMP_PERIOD_UPDATE_MS));
 }
@@ -3992,7 +3995,8 @@ static void status_change_work(struct work_struct *work)
 		 */
 		if (chip->last_temp_update_time && chip->soc_slope_limiter_en) {
 			cancel_delayed_work_sync(&chip->update_temp_work);
-			schedule_delayed_work(&chip->update_temp_work,
+			queue_delayed_work(system_power_efficient_wq,
+				&chip->update_temp_work,
 				msecs_to_jiffies(0));
 		}
 
@@ -4008,7 +4012,8 @@ static void status_change_work(struct work_struct *work)
 		 */
 		if (chip->last_sram_update_time + 5 < current_time) {
 			cancel_delayed_work(&chip->update_sram_data);
-			schedule_delayed_work(&chip->update_sram_data,
+			queue_delayed_work(system_power_efficient_wq,
+				&chip->update_sram_data,
 				msecs_to_jiffies(0));
 		}
 
@@ -4497,7 +4502,8 @@ static irqreturn_t fg_vbatt_low_handler(int irq, void *_chip)
 			disable_irq_nosync(chip->batt_irq[VBATT_LOW].irq);
 			chip->vbat_low_irq_enabled = false;
 			fg_stay_awake(&chip->empty_check_wakeup_source);
-			schedule_delayed_work(&chip->check_empty_work,
+			queue_delayed_work(system_power_efficient_wq,
+				&chip->check_empty_work,
 				msecs_to_jiffies(FG_EMPTY_DEBOUNCE_MS));
 		} else {
 			if (fg_debug_mask & FG_IRQS)
@@ -4625,7 +4631,8 @@ static irqreturn_t fg_soc_irq_handler(int irq, void *_chip)
 		msoc = get_monotonic_soc_raw(chip);
 		if (msoc == 0 || chip->soc_empty) {
 			fg_stay_awake(&chip->empty_check_wakeup_source);
-			schedule_delayed_work(&chip->check_empty_work,
+			queue_delayed_work(system_power_efficient_wq,
+				&chip->check_empty_work,
 				msecs_to_jiffies(FG_EMPTY_DEBOUNCE_MS));
 		}
 	}
@@ -4685,7 +4692,8 @@ static irqreturn_t fg_empty_soc_irq_handler(int irq, void *_chip)
 		pr_info("triggered 0x%x\n", soc_rt_sts);
 	if (fg_is_batt_empty(chip)) {
 		fg_stay_awake(&chip->empty_check_wakeup_source);
-		schedule_delayed_work(&chip->check_empty_work,
+		queue_delayed_work(system_power_efficient_wq,
+			&chip->check_empty_work,
 			msecs_to_jiffies(FG_EMPTY_DEBOUNCE_MS));
 	} else {
 		chip->soc_empty = false;
@@ -5340,7 +5348,8 @@ try_again:
 
 			if (!tried_once) {
 				cancel_delayed_work(&chip->update_sram_data);
-				schedule_delayed_work(&chip->update_sram_data,
+				queue_delayed_work(system_power_efficient_wq,
+					&chip->update_sram_data,
 					msecs_to_jiffies(0));
 				msleep(1000);
 				tried_once = true;
@@ -5861,7 +5870,7 @@ no_profile:
 	fg_relax(&chip->profile_wakeup_source);
 	return rc;
 reschedule:
-	schedule_delayed_work(
+	queue_delayed_work(system_power_efficient_wq,
 		&chip->batt_profile_init,
 		msecs_to_jiffies(BATTERY_PSY_WAIT_MS));
 	fg_relax(&chip->profile_wakeup_source);
@@ -7785,7 +7794,7 @@ static void delayed_init_work(struct work_struct *work)
 	/* release memory access before update_sram_data is called */
 	fg_mem_release(chip);
 
-	schedule_delayed_work(
+	queue_delayed_work(system_power_efficient_wq,
 		&chip->update_jeita_setting,
 		msecs_to_jiffies(INIT_JEITA_DELAY_MS));
 
@@ -7796,7 +7805,8 @@ static void delayed_init_work(struct work_struct *work)
 		update_temp_data(&chip->update_temp_work.work);
 
 	if (!chip->use_otp_profile)
-		schedule_delayed_work(&chip->batt_profile_init, 0);
+		queue_delayed_work(system_power_efficient_wq,
+			&chip->batt_profile_init, 0);
 
 	if (chip->wa_flag & IADC_GAIN_COMP_WA) {
 		rc = fg_init_iadc_config(chip);
@@ -8083,7 +8093,7 @@ static void check_and_update_sram_data(struct fg_chip *chip)
 	else
 		time_left = 0;
 
-	schedule_delayed_work(
+	queue_delayed_work(system_power_efficient_wq,
 		&chip->update_temp_work, msecs_to_jiffies(time_left * 1000));
 
 	next_update_time = chip->last_sram_update_time
@@ -8094,7 +8104,7 @@ static void check_and_update_sram_data(struct fg_chip *chip)
 	else
 		time_left = 0;
 
-	schedule_delayed_work(
+	queue_delayed_work(system_power_efficient_wq,
 		&chip->update_sram_data, msecs_to_jiffies(time_left * 1000));
 }
 
