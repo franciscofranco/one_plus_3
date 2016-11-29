@@ -300,7 +300,6 @@ static DEVICE_ATTR(irq, S_IRUSR | S_IWUSR, irq_get, irq_ack);
 extern void int_touch(void);
 extern struct completion key_cm;
 extern bool virtual_key_enable;
-extern bool s1302_is_keypad_stopped(void);
 
 bool key_home_pressed = false;
 EXPORT_SYMBOL(key_home_pressed);
@@ -328,18 +327,12 @@ static ssize_t report_home_set(struct device *dev,
 {
 	struct  fpc1020_data *fpc1020 = dev_get_drvdata(dev);
     unsigned long time;
-	bool ignore_keypad;
-
-	if (s1302_is_keypad_stopped() || virtual_key_enable)
-		ignore_keypad = true;
-	else
-		ignore_keypad = false;
 
 	if(ignor_home_for_ESD)
 		return -EINVAL;
 	if (!strncmp(buf, "down", strlen("down")))
 	{
-        if(ignore_keypad){
+        if(virtual_key_enable){
                 key_home_pressed = true;
         }else{
             input_report_key(fpc1020->input_dev,
@@ -349,7 +342,7 @@ static ssize_t report_home_set(struct device *dev,
 	}
 	else if (!strncmp(buf, "up", strlen("up")))
 	{
-        if(ignore_keypad){
+        if(virtual_key_enable){
                 key_home_pressed = false;
         }else{
             input_report_key(fpc1020->input_dev,
@@ -359,7 +352,7 @@ static ssize_t report_home_set(struct device *dev,
 	}
 	else
 		return -EINVAL;
-    if(ignore_keypad){
+    if(virtual_key_enable){
         if(!key_home_pressed){
             reinit_completion(&key_cm);
             time = wait_for_completion_timeout(&key_cm,msecs_to_jiffies(60));
