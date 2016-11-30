@@ -149,7 +149,7 @@
 				compatible = "qcom,leds-qpnp";
 				status = "okay";
 				reg=<0xa300 0x100>;
-				qcom,led_mpp_3 {
+				qcom,led_mpp_4 {
 					label = "mpp";
 					linux,name = "button-backlight";
 					linux,default-trigger = "none";
