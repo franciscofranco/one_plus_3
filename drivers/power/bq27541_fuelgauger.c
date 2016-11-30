@@ -186,7 +186,6 @@ typedef enum{
 
 struct update_pre_capacity_data{
 	struct delayed_work work;
-	struct workqueue_struct *workqueue;
 	int suspend_time;
 };
 static struct update_pre_capacity_data update_pre_capacity_data;
@@ -956,7 +955,7 @@ static void update_battery_soc_work(struct work_struct *work)
 {
 	if(is_usb_pluged() ==true )
 	{
-		schedule_delayed_work(
+		queue_delayed_work(system_power_efficient_wq,
 				&bq27541_di->battery_soc_work,
 				msecs_to_jiffies(BATTERY_SOC_UPDATE_MS));
 		if(get_dash_started()==true)
@@ -972,7 +971,7 @@ static void update_battery_soc_work(struct work_struct *work)
 	bq27541_get_battery_soc();
 	bq27541_get_batt_remaining_capacity();
 	bq27541_set_alow_reading(false);
-	schedule_delayed_work(
+	queue_delayed_work(system_power_efficient_wq,
 			&bq27541_di->battery_soc_work,
 			msecs_to_jiffies(BATTERY_SOC_UPDATE_MS));
 }
@@ -1033,7 +1032,8 @@ static void bq27541_hw_config(struct work_struct *work)
 		di->retry_count--;
 		if(di->retry_count > 0)
 		{
-			schedule_delayed_work(&di->hw_config, HZ);
+			queue_delayed_work(system_power_efficient_wq,
+				&di->hw_config, HZ);
 		}
 		else
 		{
@@ -1238,7 +1238,6 @@ static int bq27541_battery_probe(struct i2c_client *client,
 		return -ENODEV;
 
 #ifdef OPT_BQ_RESUME_TIME
-	update_pre_capacity_data.workqueue = create_workqueue("update_pre_capacity");
 	INIT_DELAYED_WORK(&(update_pre_capacity_data.work), update_pre_capacity_func);
 #endif
 
@@ -1316,8 +1315,10 @@ static int bq27541_battery_probe(struct i2c_client *client,
 	INIT_WORK(&di->counter, bq27541_coulomb_counter_work);
 	INIT_DELAYED_WORK(&di->hw_config, bq27541_hw_config);
 	INIT_DELAYED_WORK(&di->battery_soc_work, update_battery_soc_work);
-	schedule_delayed_work(&di->hw_config, BQ27541_INIT_DELAY);
-	schedule_delayed_work(&di->battery_soc_work, BATTERY_SOC_UPDATE_MS);
+	queue_delayed_work(system_power_efficient_wq,
+		&di->hw_config, BQ27541_INIT_DELAY);
+	queue_delayed_work(system_power_efficient_wq,
+		&di->battery_soc_work, BATTERY_SOC_UPDATE_MS);
 	pr_info("%s probe sucdess\n",__func__);
 	check_bat_type(di);
 
@@ -1395,10 +1396,10 @@ static int bq27541_battery_resume(struct i2c_client *client)
 		pr_debug("%s: di->rtc_resume_time - di->lcd_off_time=%ld\n", __func__,di->rtc_resume_time - di->lcd_off_time);
 		wake_lock(&di->update_soc_wake_lock);
 		get_current_time(&di->lcd_off_time);
-		queue_delayed_work(update_pre_capacity_data.workqueue,
-				&(update_pre_capacity_data.work), msecs_to_jiffies(1000));
+		queue_delayed_work(system_power_efficient_wq,
+			&(update_pre_capacity_data.work), msecs_to_jiffies(1000));
 	}
-	schedule_delayed_work(
+	queue_delayed_work(system_power_efficient_wq,
 			&bq27541_di->battery_soc_work,
 			msecs_to_jiffies(RESUME_SCHDULE_SOC_UPDATE_WORK_MS));
 #else
